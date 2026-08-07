@@ -9,8 +9,8 @@ static struct {
     uint32_t  size_y;
     uint32_t *buf;
 } spat = {
-    .size_x = 200,
-    .size_y = 150,
+    .size_x = 160,
+    .size_y =  90,
 };
 
 static void spat_resize(struct mfb_window *window, int size_x, int size_y) {
@@ -28,17 +28,6 @@ static void spat_resize(struct mfb_window *window, int size_x, int size_y) {
     float x = (size_x - sx) * 0.5;
     float y = (size_y - sy) * 0.5;
     mfb_set_viewport(window, x, y, sx, sy);
-
-#if 0
-    uint32_t draw_size_x = mfb_get_drawable_width(window);
-    uint32_t draw_size_y = mfb_get_drawable_height(window);
-
-    if ((spat.size_x != draw_size_x) || (spat.size_y != draw_size_y)) {
-        spat.size_x = draw_size_x;
-        spat.size_y = draw_size_y;
-        spat.buf = realloc(spat.buf, spat.size_x * spat.size_y * 4);
-    }
-#endif
 }
 
 int main() {
@@ -46,8 +35,8 @@ int main() {
 
     struct mfb_window *window = mfb_open_ex(
         "spat",
-        spat.size_x,
-        spat.size_y,
+        spat.size_x*5,
+        spat.size_y*5,
         MFB_WF_RESIZABLE
     );
     if (!window) return -1;

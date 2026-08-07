@@ -1,6 +1,6 @@
-project(hi)
 cmake_minimum_required(VERSION 4.3)
 
+project(spat)
 add_executable(${PROJECT_NAME} main.c)
 
 set(MINIFB_BUILD_EXAMPLES OFF)
