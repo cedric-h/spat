@@ -23,7 +23,11 @@ set(SDL_TRAY         OFF)
 set(SDL_NOTIFICATION ON )
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 
-add_executable(spat WIN32 main.c)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ./src/*.c)
+add_executable(spat WIN32 ${SOURCES})
+
+set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ON)
+
 if(MSVC)
     target_compile_options(spat PRIVATE /W4 /WX)
 else()

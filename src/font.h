@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #if 0
 // static const uint8_t _sdtx_font_kc853[2048] = {
 static const uint8_t font_data[2048] = {

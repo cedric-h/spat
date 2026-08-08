@@ -6,27 +6,27 @@
 #define spat_min(x, y) (((x) < (y)) ? (x) : (y))
 #define spat_max(x, y) (((x) > (y)) ? (x) : (y))
 
-#include "font.h"
+#include "draw.h"
 #include <math.h>
 
 static struct {
     SDL_Window *window;
 
     struct {
-        int x, y;
         int mouse_down_x, mouse_down_y;
-    } camera;
-
-    struct {
-        int mouse_down_x, mouse_down_y;
+        int camera_mouse_down_x, camera_mouse_down_y;
         int mouse_x, mouse_y;
         bool mouse_down;
     } input;
 
+    draw_Camera camera;
+
 } app = {0};
 
-SDL_HitTestResult hit_test(SDL_Window *win, const SDL_Point *area, void *data) {
-    // return SDL_HITTEST_DRAGGABLE;
+SDL_HitTestResult hit_test(SDL_Window *win, const SDL_Point *p, void *data) {
+    if (p->y < DRAW_OS_WINDOW_THICKNESSS)
+        return SDL_HITTEST_DRAGGABLE;
+
     return SDL_HITTEST_NORMAL;
 }
 
@@ -40,7 +40,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 
     app.window = SDL_CreateWindow(
-        "spat", 640, 480,
+        "spat", 60*16, 60*9,
         SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS | SDL_WINDOW_TRANSPARENT
     );
     if (app.window == NULL) {
@@ -66,9 +66,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             app.input.mouse_y = event->motion.y;
 
             if (app.input.mouse_down) {
-                app.camera.x = app.camera.mouse_down_x
+                app.camera.x = app.input.camera_mouse_down_x
                     + (app.input.mouse_down_x - app.input.mouse_x);
-                app.camera.y = app.camera.mouse_down_y
+                app.camera.y = app.input.camera_mouse_down_y
                     + (app.input.mouse_down_y - app.input.mouse_y);
             }
         } break;
@@ -77,8 +77,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
             app.input.mouse_down = true;
             app.input.mouse_down_x = event->button.x;
             app.input.mouse_down_y = event->button.y;
-            app.camera.mouse_down_x = app.camera.x;
-            app.camera.mouse_down_y = app.camera.y;
+            app.input.camera_mouse_down_x = app.camera.x;
+            app.input.camera_mouse_down_y = app.camera.y;
         } break;
 
         case SDL_EVENT_MOUSE_BUTTON_UP: {
@@ -95,57 +95,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         return SDL_APP_FAILURE;
     }
 
-    Uint32 *pixels = (Uint32 *)surface->pixels;
-    int pitch = surface->pitch / sizeof(Uint32);
-
-    /* draw checkerboard */
-    for (int y = 0; y < surface->h; y++) {
-        for (int x = 0; x < surface->w; x++) {
-            pixels[y * pitch + x] = (((x/10) ^ (y/10))&2)
-                ? SDL_MapSurfaceRGBA(surface, 0x44, 0x44, 0x44, 0xFF)
-                : SDL_MapSurfaceRGBA(surface, 0x22, 0x22, 0x22, 0xFF)
-                ; 
-        }
-    }
-
-    /* DEBUG: draw mouse */
-    if (0) {
-        int wx = (uint32_t)spat_max(0, spat_min((int)surface->w-1, app.input.mouse_x));
-        int wy = (uint32_t)spat_max(0, spat_min((int)surface->h-1, app.input.mouse_y));
-        for (int y = wy-4; y <= (wy+4); y++)
-            for (int x = wx-4; x <= (wx+4); x++)
-                pixels[y * pitch + x] =
-                    SDL_MapSurfaceRGBA(surface, 0xFF, 0xFF, 0xFF, 0xFF);
-    }
-
-    /* draw text */
-    {
-        int dst_x = 15 - app.camera.x;
-        int dst_y = 15 - app.camera.y;
-
-        int scale = 5;
-        for (char *str = "The five boxing wizards jump quickly"; *str; str++) {
-            for (int y = 0; y < 8*scale; y++) {
-                if ((dst_y + y) > surface->h) break;
-                if ((dst_y + y) < 0) continue;
-
-                char row = font_data[((size_t)*str)*8 + y/scale];
-                for (int x = 0; x < 8*scale; x++) {
-                    if ((dst_x + x) >= surface->w) break;
-                    if ((dst_x + x) < 0) continue;
-
-                    bool lit = (row & (1 << (8 - x/scale))) > 0;
-                    if (!lit) continue;
-
-                    pixels[(dst_y + y)*pitch + (dst_x + x)] =
-                        SDL_MapSurfaceRGBA(surface, 0xff, 0xff, 0xff, 0xff);
-                }
-            }
-
-            dst_x += 6*scale + 8*sinf(dst_y * 0.015f);
-            dst_y += 18*sinf(dst_x * 0.015f);
-        }
-    }
+    draw_frame(surface, app.camera);
 
     SDL_UpdateWindowSurface(app.window);
 
