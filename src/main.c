@@ -24,7 +24,7 @@ static struct {
 } app = {0};
 
 SDL_HitTestResult hit_test(SDL_Window *win, const SDL_Point *p, void *data) {
-    if (p->y < DRAW_OS_WINDOW_THICKNESSS)
+    if (p->y < DRAW_OS_WINDOW_THICKNESS)
         return SDL_HITTEST_DRAGGABLE;
 
     return SDL_HITTEST_NORMAL;
@@ -40,7 +40,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 
     app.window = SDL_CreateWindow(
-        "spat", 60*16, 60*9,
+        "spat", 50*16, 50*9,
         SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS | SDL_WINDOW_TRANSPARENT
     );
     if (app.window == NULL) {

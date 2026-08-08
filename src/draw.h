@@ -1,7 +1,7 @@
 #ifndef __DRAW_HEADER
 #define __DRAW_HEADER
 
-#define DRAW_OS_WINDOW_THICKNESSS 25
+#define DRAW_OS_WINDOW_THICKNESS 25
 #include <SDL3/SDL.h>
 
 typedef struct {

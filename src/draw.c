@@ -10,7 +10,7 @@ static struct {
 void draw_text(char *str, int x, int y, uint32_t color, int scale) {
     Uint32 *pixels = (Uint32 *)draw.surface->pixels;
     int pitch = draw.surface->pitch / sizeof(Uint32);
-    int dst_x = x - draw.camera.x;
+    int dst_x = x - draw.camera.x - 3*scale;
     int dst_y = y - draw.camera.y;
 
     for (; *str; str++) {
@@ -35,19 +35,18 @@ void draw_text(char *str, int x, int y, uint32_t color, int scale) {
 }
 
 static void draw_os_window(void) {
-    draw.camera = (draw_Camera) {0};
 
     /* shadow */
     SDL_FillSurfaceRect(
         draw.surface,
-        &(SDL_Rect) { 0, 3, draw.surface->w, DRAW_OS_WINDOW_THICKNESSS },
+        &(SDL_Rect) { 0, 2, draw.surface->w, DRAW_OS_WINDOW_THICKNESS },
         SDL_MapSurfaceRGBA(draw.surface, 0x08, 0x08, 0x08, 0xFF)
     );
 
     /* background */
     SDL_FillSurfaceRect(
         draw.surface,
-        &(SDL_Rect) { 0, 0, draw.surface->w, DRAW_OS_WINDOW_THICKNESSS },
+        &(SDL_Rect) { 0, 0, draw.surface->w, DRAW_OS_WINDOW_THICKNESS },
         SDL_MapSurfaceRGBA(draw.surface, 0x33, 0x33, 0x33, 0xFF)
     );
 
@@ -61,33 +60,45 @@ static void draw_os_window(void) {
 }
 
 void draw_frame(SDL_Surface *surface, draw_Camera canvas_camera) {
-    draw.surface = surface;
-    draw.camera = canvas_camera;
 
-    Uint32 *pixels = (Uint32 *)draw.surface->pixels;
-    int pitch = draw.surface->pitch / sizeof(Uint32);
+    /* draw canvas content */
+    {
+        draw.surface = SDL_CreateSurfaceFrom(
+            surface->w,
+            surface->h - DRAW_OS_WINDOW_THICKNESS,
+            surface->format,
+            surface->pixels + surface->pitch * DRAW_OS_WINDOW_THICKNESS,
+            surface->pitch
+        );
+        draw.camera = canvas_camera;
 
-    /* draw checkerboard */
-    for (int y = 0; y < draw.surface->h; y++) {
-        for (int x = 0; x < draw.surface->w; x++) {
-            int cx = (x + draw.camera.x + 99999)/10;
-            int cy = (y + draw.camera.y + 99999)/10;
-            pixels[y * pitch + x] = ((cx ^ cy)&2)
-                ? SDL_MapSurfaceRGBA(draw.surface, 0x44, 0x44, 0x44, 0xFF)
-                : SDL_MapSurfaceRGBA(draw.surface, 0x22, 0x22, 0x22, 0xFF)
-                ; 
+        Uint32 *pixels = (Uint32 *)draw.surface->pixels;
+        int pitch = draw.surface->pitch / sizeof(Uint32);
+
+        /* draw checkerboard */
+        for (int y = 0; y < draw.surface->h; y++) {
+            for (int x = 0; x < draw.surface->w; x++) {
+                int cx = (x + draw.camera.x + 99999)%100;
+                int cy = (y + draw.camera.y + 99999)%100;
+                pixels[y * pitch + x] = (cx == 0 || cy == 0)
+                    ? SDL_MapSurfaceRGBA(draw.surface, 0x44, 0x44, 0x44, 0xFF)
+                    : SDL_MapSurfaceRGBA(draw.surface, 0x22, 0x22, 0x22, 0xFF)
+                    ; 
+            }
         }
-    }
 
-    /* draw text */
-    draw_text(
-        "The five boxing wizards jump quickly",
-        15,
-        15,
-        SDL_MapSurfaceRGBA(draw.surface, 0xff, 0xff, 0xff, 0xff),
-        5
-    );
+        /* draw text */
+        draw_text(
+            "The five boxing wizards jump quickly",
+            5,
+            5,
+            SDL_MapSurfaceRGBA(draw.surface, 0xff, 0xff, 0xff, 0xff),
+            5
+        );
+        SDL_DestroySurface(draw.surface);
+    }
     
+    draw.surface = surface;
+    draw.camera = (draw_Camera) {0};
     draw_os_window();
 }
-
