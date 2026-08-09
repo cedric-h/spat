@@ -1,5 +1,6 @@
 #include "font.h"
 #include "draw.h"
+#include "app.h" /* app.input */
 
 static struct {
     /* camera currently being used to draw */
@@ -8,6 +9,8 @@ static struct {
 } draw;
 
 void draw_text(char *str, int x, int y, uint32_t color, int scale) {
+    scale *= draw.camera.scale;
+
     Uint32 *pixels = (Uint32 *)draw.surface->pixels;
     int pitch = draw.surface->pitch / sizeof(Uint32);
     int dst_x = x - draw.camera.x - 3*scale;
@@ -34,71 +37,65 @@ void draw_text(char *str, int x, int y, uint32_t color, int scale) {
     }
 }
 
-static void draw_os_window(void) {
+void draw_px(int x, int y, uint32_t color) {
+    if (x < 0) return;
+    if (y < 0) return;
+    if (x >= draw.surface->w) return;
+    if (y >= draw.surface->h) return;
 
-    /* shadow */
-    SDL_FillSurfaceRect(
-        draw.surface,
-        &(SDL_Rect) { 0, 2, draw.surface->w, DRAW_OS_WINDOW_THICKNESS },
-        SDL_MapSurfaceRGBA(draw.surface, 0x08, 0x08, 0x08, 0xFF)
-    );
-
-    /* background */
-    SDL_FillSurfaceRect(
-        draw.surface,
-        &(SDL_Rect) { 0, 0, draw.surface->w, DRAW_OS_WINDOW_THICKNESS },
-        SDL_MapSurfaceRGBA(draw.surface, 0x33, 0x33, 0x33, 0xFF)
-    );
-
-    draw_text(
-        "SpAT",
-        5,
-        6,
-        SDL_MapSurfaceRGBA(draw.surface, 0xaa, 0xaa, 0xaa, 0xaa),
-        2
-    );
+    Uint32 *pixels = (Uint32 *)draw.surface->pixels;
+    int pitch = draw.surface->pitch / sizeof(Uint32);
+    pixels[y*pitch + x] = color;
 }
 
-void draw_frame(SDL_Surface *surface, draw_Camera canvas_camera) {
+void draw_rect(SDL_Rect rect, uint32_t color) {
+    rect.x *= draw.camera.scale;
+    rect.y *= draw.camera.scale;
+    rect.w *= draw.camera.scale;
+    rect.h *= draw.camera.scale;
+    rect.x -= draw.camera.x;
+    rect.y -= draw.camera.y;
 
-    /* draw canvas content */
-    {
-        draw.surface = SDL_CreateSurfaceFrom(
-            surface->w,
-            surface->h - DRAW_OS_WINDOW_THICKNESS,
-            surface->format,
-            surface->pixels + surface->pitch * DRAW_OS_WINDOW_THICKNESS,
-            surface->pitch
-        );
-        draw.camera = canvas_camera;
+    SDL_FillSurfaceRect(draw.surface, &rect, color);
+}
 
-        Uint32 *pixels = (Uint32 *)draw.surface->pixels;
-        int pitch = draw.surface->pitch / sizeof(Uint32);
+void draw_rect_outline(SDL_Rect rect, uint32_t color) {
+    rect.x *= draw.camera.scale;
+    rect.y *= draw.camera.scale;
+    rect.w *= draw.camera.scale;
+    rect.h *= draw.camera.scale;
+    rect.x -= draw.camera.x;
+    rect.y -= draw.camera.y;
+    int w = rect.w, h = rect.h;
 
-        /* draw checkerboard */
-        for (int y = 0; y < draw.surface->h; y++) {
-            for (int x = 0; x < draw.surface->w; x++) {
-                int cx = (x + draw.camera.x + 99999)%100;
-                int cy = (y + draw.camera.y + 99999)%100;
-                pixels[y * pitch + x] = (cx == 0 || cy == 0)
-                    ? SDL_MapSurfaceRGBA(draw.surface, 0x44, 0x44, 0x44, 0xFF)
-                    : SDL_MapSurfaceRGBA(draw.surface, 0x22, 0x22, 0x22, 0xFF)
-                    ; 
-            }
-        }
+    for (int x = 0; x <= w; x++) draw_px(rect.x + x, rect.y + 0, color);
+    for (int x = 0; x <= w; x++) draw_px(rect.x + x, rect.y + h, color);
+    for (int y = 0; y <= h; y++) draw_px(rect.x + 0, rect.y + y, color);
+    for (int y = 0; y <= h; y++) draw_px(rect.x + w, rect.y + y, color);
+}
 
-        /* draw text */
-        draw_text(
-            "The five boxing wizards jump quickly",
-            5,
-            5,
-            SDL_MapSurfaceRGBA(draw.surface, 0xff, 0xff, 0xff, 0xff),
-            5
-        );
-        SDL_DestroySurface(draw.surface);
-    }
-    
+void draw_to(SDL_Surface *surface, draw_Camera camera) {
     draw.surface = surface;
-    draw.camera = (draw_Camera) {0};
-    draw_os_window();
+    draw.camera = camera;
+}
+
+void draw_background(void) {
+    Uint32 *pixels = (Uint32 *)draw.surface->pixels;
+    int pitch = draw.surface->pitch / sizeof(Uint32);
+
+    /* draw grid */
+    for (int y = 0; y < draw.surface->h; y++) {
+        for (int x = 0; x < draw.surface->w; x++) {
+            int cx = SDL_abs(x + draw.camera.x)%100;
+            int cy = SDL_abs(y + draw.camera.y)%100;
+            pixels[y * pitch + x] = (cx == 0 || cy == 0)
+                ? SDL_MapSurfaceRGBA(draw.surface, 0x44, 0x44, 0x44, 0xFF)
+                : SDL_MapSurfaceRGBA(draw.surface, 0x22, 0x22, 0x22, 0xFF)
+                ; 
+        }
+    }
+}
+
+uint32_t draw_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+    return SDL_MapSurfaceRGBA(draw.surface, r, g, b, a);
 }
