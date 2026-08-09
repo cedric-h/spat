@@ -16,12 +16,8 @@ typedef struct {
         int camera_mouse_down_x, camera_mouse_down_y;
 
         int canvas_mouse_x, canvas_mouse_y;
-        int window_mouse_x, window_mouse_y;
 
         bool canvas_mouse_down;
-
-        /* window size */
-        int size_x, size_y;
     } input;
 
     draw_Camera camera;
