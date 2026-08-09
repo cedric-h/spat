@@ -1,8 +1,13 @@
 #ifndef __DRAW_HEADER
 #define __DRAW_HEADER
 
-#define DRAW_OS_WINDOW_THICKNESS 25
 #include <SDL3/SDL.h>
+
+#define draw_clr_bg     draw_rgba(0x33, 0x33, 0x33, 0xFF)
+#define draw_clr_shadow draw_rgba(0x08, 0x08, 0x08, 0xFF)
+#define draw_clr_text   draw_rgba(0x66, 0x66, 0x66, 0xFF)
+#define draw_clr_black  draw_rgba(0x11, 0x11, 0x11, 0xFF)
+#define draw_clr_hilite draw_rgba(0xFF, 0xAA, 0xAA, 0xFF)
 
 typedef struct {
     int x, y, scale;

@@ -2,12 +2,12 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#include "draw.h"
+#include "canvas.h"
 #include "os_window.h"
 #include <math.h>
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
-    SDL_SetAppMetadata("Space Port Arms Technician", "1.0", "com.problemchild.spat");
+    SDL_SetAppMetadata("Spaceport Arms Technician", "1.0", "com.problemchild.spat");
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
@@ -42,40 +42,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     return SDL_APP_CONTINUE;
 }
 
-bool canvas_event(SDL_Event *event) {
-    switch (event->type) {
-        case SDL_EVENT_QUIT: {
-            return SDL_APP_SUCCESS;
-        } break;
-
-        case SDL_EVENT_MOUSE_MOTION: {
-            app.input.canvas_mouse_x = event->motion.x;
-            app.input.canvas_mouse_y = event->motion.y;
-
-            if (app.input.canvas_mouse_down) {
-                app.camera.x = app.input.camera_mouse_down_x
-                    + (app.input.canvas_mouse_down_x - app.input.canvas_mouse_x);
-                app.camera.y = app.input.camera_mouse_down_y
-                    + (app.input.canvas_mouse_down_y - app.input.canvas_mouse_y);
-            }
-        } break;
-
-        case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-            app.input.canvas_mouse_down = true;
-            app.input.canvas_mouse_down_x = event->button.x;
-            app.input.canvas_mouse_down_y = event->button.y;
-            app.input.camera_mouse_down_x = app.camera.x;
-            app.input.camera_mouse_down_y = app.camera.y;
-        } break;
-
-        case SDL_EVENT_MOUSE_BUTTON_UP: {
-            app.input.canvas_mouse_down = false;
-        } break;
-    }
-
-    return false;
-}
-
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     if (event->type == SDL_EVENT_QUIT)
         return SDL_APP_SUCCESS;
@@ -97,43 +63,20 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     os_window_set_size(surface->w, surface->h);
 
     {
-        SDL_Surface *canvas = SDL_CreateSurfaceFrom(
+        SDL_Surface *canvas_surface = SDL_CreateSurfaceFrom(
             surface->w,
-            surface->h - DRAW_OS_WINDOW_THICKNESS,
+            surface->h - os_window_TOP_BAR_THICKNESS,
             surface->format,
-            surface->pixels + surface->pitch * DRAW_OS_WINDOW_THICKNESS,
+            surface->pixels + surface->pitch * os_window_TOP_BAR_THICKNESS,
             surface->pitch
         );
-        draw_to(canvas, app.camera);
-        draw_background();
+        draw_to(canvas_surface, canvas.camera);
+        canvas_draw();
 
-        {
-            draw_text(
-                "The five boxing wizards jump quickly",
-                5,
-                5,
-                SDL_MapSurfaceRGBA(draw.surface, 0xff, 0xff, 0xff, 0xff),
-                1
-            );
-
-            uint32_t in  = SDL_MapSurfaceRGBA(draw.surface, 0xff, 0x00, 0xff, 0xff);
-            uint32_t out = SDL_MapSurfaceRGBA(draw.surface, 0xff, 0xff, 0xff, 0xff);
-            draw_rect((SDL_Rect) { 0, 0, 100, 100 }, in);
-            draw_rect_outline((SDL_Rect) { 0, 0, 100, 100 }, out);
-
-            draw_rect((SDL_Rect) { 100, 100, 100, 100 }, in);
-            draw_rect_outline((SDL_Rect) { 100, 100, 100, 100 }, out);
-
-            draw_rect((SDL_Rect) { 200, 200, 100, 100 }, in);
-            draw_rect_outline((SDL_Rect) { 200, 200, 100, 100 }, out);
-        }
-
-        SDL_DestroySurface(canvas);
+        SDL_DestroySurface(canvas_surface);
     }
 
-    draw.surface = surface;
-    draw.camera = (draw_Camera) { .scale = 1 };
-
+    draw_to(surface, (draw_Camera) { .scale = 1 });
     os_window_fn(os_window_Mode_Draw, NULL);
 
     SDL_UpdateWindowSurface(app.window);

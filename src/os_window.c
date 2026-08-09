@@ -1,4 +1,5 @@
 #include "os_window.h"
+#include "draw.h"
 
 static struct {
     /* mouse position/hit test position */
@@ -27,8 +28,8 @@ static bool os_window_button(os_window_Button button, int x, int y, bool enabled
         case os_window_Button_NONE:    label = "?"; break;
     }
 
-    uint32_t color = clr_text;
-    if (!enabled) color = clr_black;
+    uint32_t color = draw_clr_text;
+    if (!enabled) color = draw_clr_black;
 
     float cx = x + 8; /* assuming one character label and roughly 8x8 font at x2 scale */
     float cy = y + 8;
@@ -40,7 +41,7 @@ static bool os_window_button(os_window_Button button, int x, int y, bool enabled
 
     if (enabled && dst < 8) {
         os_window.drag = false;
-        color = clr_hilite;
+        color = draw_clr_hilite;
 
         if (os_window.do_mouse_down)
             os_window.mouse_down_button = (uint8_t) button;
@@ -72,9 +73,9 @@ bool os_window_fn(os_window_Mode mode, const SDL_Point *p) {
 
     /* assume drag/capture if mouse over bar */
     {
-        bool over_bar = p->y < DRAW_OS_WINDOW_THICKNESS;
+        bool over_bar = p->y < os_window_TOP_BAR_THICKNESS;
         /* let active drag on the canvas take priority */
-        if (app.input.canvas_mouse_down) over_bar = false;
+        if (canvas.input.mouse_down) over_bar = false;
         os_window.drag = os_window.capture = over_bar;
     }
 
@@ -82,14 +83,14 @@ bool os_window_fn(os_window_Mode mode, const SDL_Point *p) {
     if (do_draw) {
         /* shadow */
         draw_rect(
-            (SDL_Rect) { 0, 2, os_window.size_x, DRAW_OS_WINDOW_THICKNESS },
-            clr_shadow
+            (SDL_Rect) { 0, 2, os_window.size_x, os_window_TOP_BAR_THICKNESS },
+            draw_clr_shadow
         );
 
         /* background */
         draw_rect(
-            (SDL_Rect) { 0, 0, os_window.size_x, DRAW_OS_WINDOW_THICKNESS },
-            clr_bg
+            (SDL_Rect) { 0, 0, os_window.size_x, os_window_TOP_BAR_THICKNESS },
+            draw_clr_bg
         );
     }
 
@@ -97,13 +98,13 @@ bool os_window_fn(os_window_Mode mode, const SDL_Point *p) {
     {
         int x = 5, y = 6;
 
-        if (do_draw) draw_text("SpAT", x, y, clr_text, 2); x += 60;
+        if (do_draw) draw_text("SpAT", x, y, draw_clr_text, 2); x += 60;
 
         x -= 20;
-        if (os_window_button(os_window_Button_ZoomIn, x += 20, y, app.camera.scale < 5))
-            app.camera.scale += 1;
-        if (os_window_button(os_window_Button_ZoomOut, x += 20, y, app.camera.scale > 1))
-            app.camera.scale -= 1;
+        if (os_window_button(os_window_Button_ZoomIn, x += 20, y, canvas.camera.scale < 5))
+            canvas.camera.scale += 1;
+        if (os_window_button(os_window_Button_ZoomOut, x += 20, y, canvas.camera.scale > 1))
+            canvas.camera.scale -= 1;
 
         if (os_window_button(os_window_Button_Quit, os_window.size_x - 20, 4, true))
             SDL_Quit();
@@ -112,7 +113,7 @@ bool os_window_fn(os_window_Mode mode, const SDL_Point *p) {
     /* outline around entire window */
     if (do_draw) draw_rect_outline(
         (SDL_Rect) { 0, 0, os_window.size_x, os_window.size_y },
-        clr_bg
+        draw_clr_bg
     );
 
     if (os_window.do_hit_test)
