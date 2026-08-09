@@ -8,7 +8,22 @@ static struct {
     SDL_Surface *surface;
 } draw;
 
+SDL_Rect draw_text_measure(char *str, int x, int y, int scale) {
+    SDL_Rect r = { .x = x, .y = y, .h = 8*scale };
+    for (; *str; str++) r.w += 6*scale;
+    r.w -= 1*scale;
+    return r;
+}
+void draw_text_centered(char *str, SDL_Rect r, uint32_t color, int scale) {
+    SDL_Rect size = draw_text_measure(str, r.x, r.y, scale);
+    int x = r.x + (r.w - size.w)/2;
+    int y = r.y + (r.h - size.h)/2;
+    draw_text(str, x, y, color, scale);
+}
+
 void draw_text(char *str, int x, int y, uint32_t color, int scale) {
+    x *= draw.camera.scale;
+    y *= draw.camera.scale;
     scale *= draw.camera.scale;
 
     Uint32 *pixels = (Uint32 *)draw.surface->pixels;

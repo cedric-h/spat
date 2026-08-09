@@ -29,10 +29,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
             return SDL_APP_FAILURE;
         }
 
-        if (SDL_SetWindowSurfaceVSync(app.window, true))
-            SDL_Log("vsync enabled");
-        else
-            SDL_Log("vsync disabled: %s", SDL_GetError());
+        // if (SDL_SetWindowSurfaceVSync(app.window, true))
+        //     SDL_Log("vsync enabled");
+        // else
+        //     SDL_Log("vsync disabled: %s", SDL_GetError());
     }
 
     if (!SDL_SetWindowHitTest(app.window, os_window_hit_test, NULL)) {

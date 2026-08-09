@@ -7,6 +7,7 @@
 #define draw_clr_shadow draw_rgba(0x08, 0x08, 0x08, 0xFF)
 #define draw_clr_text   draw_rgba(0x66, 0x66, 0x66, 0xFF)
 #define draw_clr_black  draw_rgba(0x11, 0x11, 0x11, 0xFF)
+#define draw_clr_white  draw_rgba(0xFF, 0xFF, 0xFF, 0xFF)
 #define draw_clr_hilite draw_rgba(0xFF, 0xAA, 0xAA, 0xFF)
 
 typedef struct {
@@ -16,7 +17,10 @@ typedef struct {
 void draw_to(SDL_Surface *surface, draw_Camera canvas_camera);
 void draw_background(void);
 
-void draw_text(char *str, int x, int y, uint32_t color, int scale);
+void     draw_text(char *str, int x, int y, uint32_t color, int scale);
+SDL_Rect draw_text_measure(char *str, int x, int y, int scale);
+void     draw_text_centered(char *str, SDL_Rect r, uint32_t color, int scale);
+
 void draw_rect_outline(SDL_Rect rect, uint32_t color);
 void draw_rect(SDL_Rect rect, uint32_t color);
 void draw_px(int x, int y, uint32_t color);
