@@ -14,7 +14,20 @@ typedef struct {
     int x, y, scale;
 } draw_Camera;
 
-void draw_to(SDL_Surface *surface, draw_Camera canvas_camera);
+typedef struct {
+    /* subset of the SDL_Surface draw will write into */
+    SDL_Rect extents;
+
+    /* we modify the sdl_surface->pixels to move where we write to,
+     * so we need to track where the original start was so we can reset
+     * between draw invocations */
+    void *og_pixels;
+
+    /* the screen! */
+    SDL_Surface *sdl_surface;
+} draw_Surface;
+
+void draw_to(draw_Surface surface, draw_Camera canvas_camera);
 void draw_background(void);
 
 void     draw_text(char *str, int x, int y, uint32_t color, int scale);

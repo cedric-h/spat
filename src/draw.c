@@ -89,8 +89,15 @@ void draw_rect_outline(SDL_Rect rect, uint32_t color) {
     for (int y = 0; y <= h; y++) draw_px(rect.x + w, rect.y + y, color);
 }
 
-void draw_to(SDL_Surface *surface, draw_Camera camera) {
-    draw.surface = surface;
+void draw_to(draw_Surface draw_surface, draw_Camera camera) {
+    SDL_Surface *s = draw_surface.sdl_surface;
+    s->w = draw_surface.extents.w;
+    s->h = draw_surface.extents.h;
+    s->pixels = draw_surface.og_pixels +
+        s->pitch * draw_surface.extents.y +
+        draw_surface.extents.x;
+
+    draw.surface = s;
     draw.camera = camera;
 }
 

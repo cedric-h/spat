@@ -1,5 +1,6 @@
 #include "canvas.h"
 #include "draw.h"
+#include "rect.h"
 
 static struct {
     struct {
@@ -54,33 +55,17 @@ void canvas_draw(void) {
     draw_background();
 
     {
-        // char *str = "THE five boxing WIZARDS jump QUICKLY";
-        // draw_text(str, -16, -16, draw_clr_white, 2);
-        // draw_rect_outline(draw_text_measure(str, -16, -16, 2), draw_clr_white);
+        SDL_Rect supply_rect = (SDL_Rect) { 0, 0, 100, 100 };
 
-        // draw_text_centered("Xyz", (SDL_Rect) { 100, 100, 100,  50 }, draw_clr_white, 3);
-        // draw_text_centered("Xyz", (SDL_Rect) { 100, 100, 100, 100 }, draw_clr_white, 2);
-        // draw_text_centered("Xyz", (SDL_Rect) { 100, 150, 100,  50 }, draw_clr_white, 1);
-        // draw_rect_outline((SDL_Rect) { 100, 100, 100, 100 }, draw_clr_white);
+        draw_rect_outline(supply_rect, draw_clr_white);
 
-        // draw_rect((SDL_Rect) { 0, 0, 100, 100 }, in);
-        draw_rect_outline((SDL_Rect) { 0, 0, 100, 100 }, draw_clr_white);
-        draw_text_centered("xyz", (SDL_Rect) {  0,  0, 100, 80 }, draw_clr_white, 1);
-        draw_text_centered("yes", (SDL_Rect) {  0, 80,  50, 20 }, draw_clr_white, 1);
-        draw_text_centered( "no", (SDL_Rect) { 50, 80,  50, 20 }, draw_clr_white, 1);
+        SDL_Rect options = rect_cut_bottom(&supply_rect, 20);
+        draw_text_centered("xyz", supply_rect, draw_clr_white, 2);
 
-#if 0
-        uint32_t in  = draw_rgba(0xff, 0x00, 0xff, 0xff);
-        uint32_t out = draw_rgba(0xff, 0xff, 0xff, 0xff);
-        draw_rect((SDL_Rect) { 0, 0, 100, 100 }, in);
-        draw_rect_outline((SDL_Rect) { 0, 0, 100, 100 }, out);
-
-        draw_rect((SDL_Rect) { 100, 100, 100, 100 }, in);
-        draw_rect_outline((SDL_Rect) { 100, 100, 100, 100 }, out);
-
-        draw_rect((SDL_Rect) { 200, 200, 100, 100 }, in);
-        draw_rect_outline((SDL_Rect) { 200, 200, 100, 100 }, out);
-#endif
+        SDL_Rect yes = options;
+        SDL_Rect  no = rect_cut_right(&yes, 50);
+        draw_text_centered("yes", yes, draw_clr_white, 1);
+        draw_text_centered( "no",  no, draw_clr_white, 1);
     }
 }
 
