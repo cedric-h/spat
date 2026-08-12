@@ -40,6 +40,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
         SDL_Log("Couldn't set hit test: %s", SDL_GetError());
     }
 
+    app_cursors_init();
+
     return SDL_APP_CONTINUE;
 }
 
@@ -71,6 +73,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     {
         draw_Surface canvas_surface = surface;
         rect_cut_top(&canvas_surface.extents, os_window_TOP_BAR_THICKNESS);
+        app.canvas_window_rect = canvas_surface.extents;
+
         draw_to(canvas_surface, canvas.camera);
         canvas_draw();
     }
@@ -79,10 +83,13 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     os_window_set_size(sdl_surface->w, sdl_surface->h);
     os_window_fn(os_window_Mode_Draw, NULL);
 
+    app_cursors_update();
+
     SDL_UpdateWindowSurface(app.window);
 
     return SDL_APP_CONTINUE;
 }
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
+    app_cursors_free();
 }

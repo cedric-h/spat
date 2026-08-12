@@ -33,3 +33,10 @@ SDL_Rect rect_cut_bottom(SDL_Rect *rect, float a) {
     rect->h -= a;
     return ret;
 }
+
+void rect_shrink(SDL_Rect *rect, float a) {
+    rect->x += a;
+    rect->y += a;
+    rect->w -= a*2;
+    rect->h -= a*2;
+}

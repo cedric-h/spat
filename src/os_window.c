@@ -14,7 +14,7 @@ static struct {
     /* booleans for what mode we're in */
     bool do_draw, do_hit_test, do_capture, do_click, do_mouse_down;
 
-    struct { int mouse_x, mouse_y; } input;
+    struct { int mouse_x, mouse_y; bool mouse_down; } input;
     int size_x, size_y;
 } os_window;
 
@@ -28,8 +28,8 @@ static bool os_window_button(os_window_Button button, int x, int y, bool enabled
         case os_window_Button_NONE:    label = "?"; break;
     }
 
-    uint32_t color = draw_clr_text;
-    if (!enabled) color = draw_clr_black;
+    uint32_t color = draw_clr_title;
+    if (!enabled) color = draw_clr_disabled;
 
     float cx = x + 8; /* assuming one character label and roughly 8x8 font at x2 scale */
     float cy = y + 8;
@@ -42,6 +42,7 @@ static bool os_window_button(os_window_Button button, int x, int y, bool enabled
     if (enabled && dst < 8) {
         os_window.drag = false;
         color = draw_clr_hilite;
+        app.cursor = app_Cursor_Pointer;
 
         if (os_window.do_mouse_down)
             os_window.mouse_down_button = (uint8_t) button;
@@ -75,8 +76,13 @@ bool os_window_fn(os_window_Mode mode, const SDL_Point *p) {
     {
         bool over_bar = p->y < os_window_TOP_BAR_THICKNESS;
         /* let active drag on the canvas take priority */
-        if (canvas.input.mouse_down) over_bar = false;
+        if (canvas.input.is_mouse_down) over_bar = false;
         os_window.drag = os_window.capture = over_bar;
+
+        if (do_draw && over_bar)
+            app.cursor = (os_window.input.mouse_down || canvas.input.is_mouse_down) ?
+                app_Cursor_Grabbing :
+                app_Cursor_Grab;
     }
 
     /* top bar background */
@@ -98,7 +104,7 @@ bool os_window_fn(os_window_Mode mode, const SDL_Point *p) {
     {
         int x = 5, y = 6;
 
-        if (do_draw) draw_text("SpAT", x, y, draw_clr_text, 2); x += 60;
+        if (do_draw) draw_text("SpAT", x, y, draw_clr_title, 2); x += 60;
 
         x -= 20;
         if (os_window_button(os_window_Button_ZoomIn, x += 20, y, canvas.camera.scale < 5))
@@ -151,6 +157,8 @@ bool os_window_event(SDL_Event *event) {
         } break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+            os_window.input.mouse_down = true;
+
             SDL_Point p = { event->button.x, event->button.y };
             if (os_window_fn(os_window_Mode_Capture, &p)) {
                 os_window_fn(os_window_Mode_MouseDown, &p);
@@ -159,8 +167,9 @@ bool os_window_event(SDL_Event *event) {
         } break;
 
         case SDL_EVENT_MOUSE_BUTTON_UP: {
-            SDL_Point p = { event->button.x, event->button.y };
+            os_window.input.mouse_down = false;
 
+            SDL_Point p = { event->button.x, event->button.y };
             os_window_fn(os_window_Mode_Click, &p);
         } break;
     }

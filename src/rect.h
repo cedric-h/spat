@@ -17,4 +17,7 @@ SDL_Rect rect_cut_right(SDL_Rect *rect, float a);
 /* cuts off the bottom side of "rect" at a depth of "a" and returns the sliced off bit as a new rect */
 SDL_Rect rect_cut_bottom(SDL_Rect *rect, float a);
 
+/* cuts away all sides by a depth of "a"  */
+void rect_shrink(SDL_Rect *rect, float a);
+
 #endif
