@@ -87,3 +87,49 @@ void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
 
     }
 }
+
+typedef struct {
+    /* TODO: intrusive freelist */
+    uint32_t gen;
+    gadget_Gadget gadget;
+} gadget_Entry;
+
+static struct {
+    gadget_Entry *entries;
+    uint32_t capacity;
+} state = {0};
+
+/* allocates space for a new gadget, returns it ZII-ed sans its ID */
+gadget_Gadget *gadget_alloc(void) {
+    for (uint32_t i = 0; i < state.capacity; i++) {
+        gadget_Entry *e = state.entries + i;
+        if (e->gadget.id.gen < spat_max(1, e->gen)) {
+            SDL_zerop(&e->gadget);
+            e->gadget.id.gen = spat_max(1, e->gen);
+            e->gadget.id.idx = i;
+            return &e->gadget;
+        }
+    }
+
+    size_t old_capacity = state.capacity;
+    state.capacity = spat_max(1024, state.capacity << 1);
+    state.entries = SDL_realloc(state.entries, state.capacity * sizeof(gadget_Entry));
+    SDL_memset(
+        state.entries + old_capacity,
+        0,
+        (state.capacity - old_capacity) * sizeof(gadget_Entry)
+    );
+    return gadget_alloc();
+}
+
+/* returns a pointer to a gadget. don't hold this for longer than
+ * necessary, because any call to alloc can invalidate it.  */
+gadget_Gadget *gadget_get(gadget_ID id) {
+    /* this gadget_ID points to a dead/future man! */
+    if (state.entries[id.idx].gen != id.gen) return NULL;
+    return &state.entries[id.idx].gadget;
+}
+
+void gadget_free(gadget_ID id) {
+    state.entries[id.idx].gen = spat_max(id.gen + 1, state.entries[id.idx].gen); /* idempotent */
+}
