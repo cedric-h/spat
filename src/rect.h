@@ -1,5 +1,6 @@
 #ifndef __RECT_IMPL
 #define __RECT_IMPL
+#include <SDL3/SDL.h>
 
 /**
  * see https://archive.ph/Gglet (archive of https://halt.software/dead-simple-layouts/) for rationale
@@ -18,6 +19,15 @@ SDL_Rect rect_cut_right(SDL_Rect *rect, float a);
 SDL_Rect rect_cut_bottom(SDL_Rect *rect, float a);
 
 /* cuts away all sides by a depth of "a"  */
-void rect_shrink(SDL_Rect *rect, float a);
+SDL_Rect rect_shrink(SDL_Rect rect, float a);
+
+/* grows all sides by a depth of "a"  */
+SDL_Rect rect_inflate(SDL_Rect rect, float a);
+
+/* returns a new rect where "child" is in the center of "parent" */
+SDL_Rect rect_centered_in(SDL_Rect parent, SDL_Rect child);
+
+/* "clamps" point inside rect */
+SDL_Point rect_clamp_point(SDL_Rect rect, SDL_Point p);
 
 #endif

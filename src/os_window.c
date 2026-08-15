@@ -1,5 +1,9 @@
+#include <math.h>
+
 #include "os_window.h"
 #include "draw.h"
+#include "app.h"
+#include "canvas.h" /* canvas.input.is_mouse_down, canvas.camera */
 
 static struct {
     /* mouse position/hit test position */
@@ -74,13 +78,17 @@ bool os_window_fn(os_window_Mode mode, const SDL_Point *p) {
 
     /* assume drag/capture if mouse over bar */
     {
+        bool owning_drag =
+            (app.drag_owner == app_DragOwner_NONE) ||
+            (app.drag_owner == app_DragOwner_OsWindow);
+
         bool over_bar = p->y < os_window_TOP_BAR_THICKNESS;
-        /* let active drag on the canvas take priority */
-        if (canvas.input.is_mouse_down) over_bar = false;
+        /* let active drag on e.g. the canvas take priority */
+        if (!owning_drag) over_bar = false;
         os_window.drag = os_window.capture = over_bar;
 
         if (do_draw && over_bar)
-            app.cursor = (os_window.input.mouse_down || canvas.input.is_mouse_down) ?
+            app.cursor = (os_window.input.mouse_down) ?
                 app_Cursor_Grabbing :
                 app_Cursor_Grab;
     }
@@ -130,6 +138,9 @@ bool os_window_fn(os_window_Mode mode, const SDL_Point *p) {
 }
 
 SDL_HitTestResult os_window_hit_test(SDL_Window *win, const SDL_Point *p, void *data) {
+    (void) win;
+    (void) data;
+
     if (os_window_fn(os_window_Mode_HitTest, p)) {
         /* if the hit test is failing you should NOT be trusting your mouse input */
         os_window.input.mouse_x = 0;
@@ -161,6 +172,7 @@ bool os_window_event(SDL_Event *event) {
 
             SDL_Point p = { event->button.x, event->button.y };
             if (os_window_fn(os_window_Mode_Capture, &p)) {
+                app.drag_owner = app_DragOwner_OsWindow;
                 os_window_fn(os_window_Mode_MouseDown, &p);
                 return true;
             }

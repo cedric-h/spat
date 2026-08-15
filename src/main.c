@@ -3,11 +3,16 @@
 #include <SDL3/SDL_main.h>
 
 #include "rect.h"
+#include "app.h"
+#include "draw.h"
 #include "canvas.h"
+#include "gadget.h"
 #include "os_window.h"
 #include <math.h>
 
-SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
+SDL_AppResult SDL_AppInit(void **_, int argc, char *argv[]) {
+    (void) argc;
+    (void) argv;
     SDL_SetAppMetadata("Spaceport Arms Technician", "1.0", "com.problemchild.spat");
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -42,10 +47,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
     app_cursors_init();
 
+    gadget_init();
+
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
+SDL_AppResult SDL_AppEvent(void *_, SDL_Event *event) {
+    if (event->type == SDL_EVENT_MOUSE_BUTTON_UP)
+        app.drag_owner = app_DragOwner_NONE;
+
     if (event->type == SDL_EVENT_QUIT)
         return SDL_APP_SUCCESS;
 
@@ -57,7 +67,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppIterate(void *appstate) {
+SDL_AppResult SDL_AppIterate(void *_) {
     SDL_Surface *sdl_surface = SDL_GetWindowSurface(app.window);
     if (sdl_surface == NULL) {
         SDL_Log("Couldn't get framebuffer surface: %s", SDL_GetError());
@@ -90,6 +100,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     return SDL_APP_CONTINUE;
 }
 
-void SDL_AppQuit(void *appstate, SDL_AppResult result) {
+void SDL_AppQuit(void *_, SDL_AppResult result) {
+    (void) result;
     app_cursors_free();
 }

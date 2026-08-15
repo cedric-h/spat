@@ -2,32 +2,12 @@
 #include "draw.h"
 #include "rect.h"
 #include "gadget.h"
+#include "app.h"
 
-static struct {
-    struct {
-        /* all of these are in screenspace, not worldspace (see canvas.mouse for worldspace) */
-        SDL_Point mouse_down, camera_mouse_down, mouse;
-        bool is_mouse_down;
-    } input;
-
-    /* mouse in world position (mouse position in input is in screen position) */
-    SDL_Point mouse;
-
-    draw_Camera camera;
-
-    gadget_Gadget gadgets[100];
-} canvas = {
+canvas_Canvas canvas = {
     .camera.scale = 2,
     .camera.x = -50,
     .camera.y = -50,
-
-    .gadgets = {
-        (gadget_Gadget) { .extents = {   0,   0, 100, 100 }, .kind = gadget_Kind_Supply    },
-        (gadget_Gadget) { .extents = { 150,  50,  30,  30 }, .kind = gadget_Kind_Component },
-        (gadget_Gadget) { .extents = { 150, 100,  30,  30 }, .kind = gadget_Kind_Component },
-        (gadget_Gadget) { .extents = { 150, 100,  50,  50 }, .kind = gadget_Kind_TestRig   },
-        (gadget_Gadget) { .extents = { 250,   0, 100, 100 }, .kind = gadget_Kind_Sell      },
-    },
 };
 
 static SDL_Point canvas_screen_to_world(SDL_Point screen) {
@@ -51,17 +31,8 @@ bool canvas_event(SDL_Event *event) {
             (SDL_Point) { event->motion.x, event->motion.y }
         );
 
-    gadget_Do doin = {
-        .kind = gadget_DoKind_Event,
-        .body = { .event = { .data = event } },
-    };
-    for (int i = 0; i < countof(canvas.gadgets); i++) {
-        gadget_Gadget *g = canvas.gadgets + i;
-        if (g->kind == gadget_Kind_NONE) continue;
-        gadget_do(g, &doin);
-
-        if (doin.body.event.capture) return true;
-    }
+    if (gadget_event(event, canvas.mouse))
+        return true;
 
     switch (event->type) {
         case SDL_EVENT_QUIT: {
@@ -81,6 +52,7 @@ bool canvas_event(SDL_Event *event) {
         } break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+            app.drag_owner = app_DragOwner_Canvas;
             canvas.input.is_mouse_down = true;
             canvas.input.mouse_down.x = event->button.x;
             canvas.input.mouse_down.y = event->button.y;
@@ -100,9 +72,13 @@ void canvas_draw(void) {
     draw_background();
     app.cursor = app_Cursor_Move;
 
-    for (int i = 0; i < countof(canvas.gadgets); i++) {
-        gadget_Gadget *g = canvas.gadgets + i;
-        if (g->kind == gadget_Kind_NONE) continue;
-        gadget_do(g, &(gadget_Do) { .kind = gadget_DoKind_Draw });
+    gadget_Do doin = { .kind = gadget_DoKind_Draw, .canvas_mouse = canvas.mouse };
+    for (gadget_Iter i = {0}; gadget_iter_next(&i);) {
+        gadget_do(i.g, &doin);
     }
+}
+
+/* disgusting, but used by os_window to not interrupt canvas actions for dragging window */
+bool canvas_input_is_mouse_down() {
+    return canvas.input.is_mouse_down;
 }

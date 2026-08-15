@@ -1,5 +1,6 @@
 #include "font.h"
 #include "draw.h"
+#include "rect.h"
 #include "app.h" /* app.input */
 
 static struct {
@@ -15,10 +16,8 @@ SDL_Rect draw_text_measure(char *str, int x, int y, int scale) {
     return r;
 }
 void draw_text_centered(char *str, SDL_Rect r, uint32_t color, int scale) {
-    SDL_Rect size = draw_text_measure(str, r.x, r.y, scale);
-    int x = r.x + (r.w - size.w)/2;
-    int y = r.y + (r.h - size.h)/2;
-    draw_text(str, x, y, color, scale);
+    SDL_Rect center = rect_centered_in(r, draw_text_measure(str, r.x, r.y, scale));
+    draw_text(str, center.x, center.y, color, scale);
 }
 
 void draw_text(char *str, int x, int y, uint32_t color, int scale) {

@@ -1,5 +1,7 @@
 #ifndef __OS_WINDOW_IMPL
 #define __OS_WINDOW_IMPL
+#include <stdbool.h>
+#include <SDL3/SDL.h>
 
 #define os_window_TOP_BAR_THICKNESS 25
 
@@ -19,8 +21,6 @@ typedef enum {
    os_window_Button_Quit,
    os_window_Button_NONE,
 } os_window_Button;
-/* returns true on click */
-static bool os_window_button(os_window_Button button, int x, int y, bool enabled);
 
 SDL_HitTestResult os_window_hit_test(SDL_Window *win, const SDL_Point *p, void *data);
 bool os_window_event(SDL_Event *event);
