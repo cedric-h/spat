@@ -3,48 +3,147 @@
 #include "draw.h"
 #include "app.h"
 
-static bool gadget_child_has(gadget_ID daddy, gadget_ID child);
+/* actions that change The Shape of The Tree are queued
+ * up and played out after the Eventing is over, to prevent
+ * weird situations where gadgets don't get the updates they need. */
+typedef enum {
+    gadget_ActionKind_NONE,
+    gadget_ActionKind_ChildTake,
+    gadget_ActionKind_ChildGive,
+    gadget_ActionKind_HeldSet,
+} gadget_ActionKind;
+typedef struct {
+    gadget_ActionKind kind;
+    union {
+        struct { gadget_ID child, daddy; } child_take;
+        struct { gadget_ID child, daddy; } child_give;
+        struct { gadget_ID held; } held_set;
+    } kind_data;
+} gadget_Action;
 
-/* adds a child to a gadget - returns true if the child was not already present */
-static bool gadget_child_add(gadget_ID daddy, gadget_ID child) {
-    gadget_get(child)->daddy_id = daddy;
+typedef struct {
+    /* TODO: intrusive freelist/active skiplist */
+    uint32_t gen;
+    gadget_Gadget gadget;
+} gadget_Entry;
 
-    gadget_ID sibling = gadget_get(daddy)->firstborn_id;
-    if (sibling == gadget_ID_NONE) {
-         gadget_get(daddy)->firstborn_id = child;
-         return true;
-    }
+static struct {
+    gadget_Entry *entries;
+    uint32_t entries_capacity;
 
-    for (;;) {
-        if (sibling == child) return false;
-        gadget_ID next_sibling = gadget_get(sibling)->next_sibling_id;
-        if (!next_sibling) {
-            gadget_get(sibling)->next_sibling_id = child;
-            return true;
-        }
-        sibling = next_sibling;
-    }
-    
-    assert(false);
+    gadget_Action actions[10];
+    int actions_next_idx;
+
+    /* don't set held_gadget directly as some gadgets like to see
+     * who used to be held on SDL_EVENT_MOUSE_BUTTON_UP and won't see
+     * that you were the held one if your Event handler runs before theirs.
+     *
+     * instead use gadget_held_set  */
+    gadget_ID held_gadget;
+} state = {0};
+
+static void gadget_action_queue(gadget_Action a) {
+    assert(state.actions_next_idx < countof(state.actions));
+    state.actions[state.actions_next_idx++] = a;
 }
 
-/* removes a child from a gadget - returns true if the child existed */
-static bool gadget_child_take(gadget_ID daddy, gadget_ID child) {
-    gadget_get(child)->daddy_id = gadget_ID_NONE;
+/* queues adding a child to a gadget */
+static void gadget_held_set(gadget_ID held) {
+    gadget_action_queue((gadget_Action) {
+        .kind = gadget_ActionKind_HeldSet,
+        .kind_data.held_set = { .held = held },
+    });
+}
 
-    gadget_ID sibling = gadget_get(daddy)->firstborn_id;
-    if (sibling == child) {
-        gadget_get(daddy)->firstborn_id = gadget_get(sibling)->next_sibling_id;
-        return true;
-    }
+/* queues adding a child to a gadget */
+static void gadget_child_give(gadget_ID daddy, gadget_ID child) {
+    assert(child && daddy);
+    log_trace("queueing giving '%s' to '%s',\n", gadget_get(child)->debug_str,
+                                                 gadget_get(daddy)->debug_str);
+    gadget_action_queue((gadget_Action) {
+        .kind = gadget_ActionKind_ChildGive,
+        .kind_data.child_give = { .daddy = daddy, .child = child },
+    });
+}
 
-    for (;;) {
-        if (sibling == gadget_ID_NONE) return false;
-        if (sibling == child) {
-            return true;
+/* queues removing a child from a gadget */
+static void gadget_child_take(gadget_ID daddy, gadget_ID child) {
+    assert(child && daddy);
+    log_trace("queueing taking '%s' from '%s',\n", gadget_get(child)->debug_str,
+                                                   gadget_get(daddy)->debug_str);
+    gadget_action_queue((gadget_Action) {
+        .kind = gadget_ActionKind_ChildTake,
+        .kind_data.child_take = { .daddy = daddy, .child = child },
+    });
+}
+
+static void gadget_actions_execute(void) {
+    for (int i = 0; i < state.actions_next_idx; i++) {
+        gadget_Action action = state.actions[i];
+
+        switch (action.kind) {
+
+            case gadget_ActionKind_NONE: break;
+
+            case gadget_ActionKind_HeldSet: state.held_gadget = action.kind_data.held_set.held; break;
+
+            case gadget_ActionKind_ChildGive: {
+
+                gadget_ID child = action.kind_data.child_give.child;
+                gadget_ID daddy = action.kind_data.child_give.daddy;
+
+                log_trace("giving '%s' to '%s',\n", gadget_get(child)->debug_str,
+                                                    gadget_get(daddy)->debug_str);
+
+                gadget_get(child)->daddy_id = daddy;
+
+                gadget_ID sibling = gadget_get(daddy)->firstborn_id;
+                if (sibling == gadget_ID_NONE) {
+                     gadget_get(daddy)->firstborn_id = child;
+                     continue; // success = true;
+                }
+
+                for (;;) {
+                    if (sibling == child) break; // success = false;
+                    gadget_ID next_sibling = gadget_get(sibling)->next_sibling_id;
+                    if (!next_sibling) {
+                        gadget_get(sibling)->next_sibling_id = child;
+                        break; // success = true;
+                    }
+                    sibling = next_sibling;
+                }
+            } break;
+
+            case gadget_ActionKind_ChildTake: {
+                gadget_ID child = action.kind_data.child_take.child;
+                gadget_ID daddy = action.kind_data.child_take.daddy;
+
+                log_trace("taking '%s' from '%s',\n", gadget_get(child)->debug_str,
+                                                      gadget_get(daddy)->debug_str);
+
+                gadget_get(child)->daddy_id = gadget_ID_NONE;
+
+                gadget_ID sibling = gadget_get(daddy)->firstborn_id;
+                if (sibling == child) {
+                    gadget_get(daddy)->firstborn_id = gadget_get(sibling)->next_sibling_id;
+                    continue; // success = true;
+                }
+
+                for (;;) {
+                    if (sibling == gadget_ID_NONE) break; // success = false;
+                    if (gadget_get(sibling)->next_sibling_id == child) {
+                        gadget_get(sibling)->next_sibling_id = gadget_get(child)->next_sibling_id;
+                        break; // success = true;
+                    }
+                    sibling = gadget_get(sibling)->next_sibling_id;
+                }
+            } break;
         }
-        sibling = gadget_get(sibling)->next_sibling_id;
     }
+
+    // SDL_zerop(state.actions);
+    memset(state.actions, 0, sizeof(state.actions));
+    state.actions_next_idx = 0;
 }
 
 /* returns true if a gadget has no children */
@@ -63,54 +162,58 @@ static bool gadget_child_has(gadget_ID daddy, gadget_ID child) {
     }
 }
 
-static bool gadget_clamp_to_grid(SDL_Rect *to_clamp, SDL_Rect grid_area) {
+static bool gadget_sell_clamp_to_grid(
+    gadget_Gadget *sell,
+    SDL_Rect *to_clamp,
+    gadget_ID gadget_to_clamp,
+    SDL_Rect grid_area
+) {
     int GRID_SIZE = 10;
 
     assert(to_clamp);
 
     SDL_Rect clamped = *to_clamp;
-    clamped.x -= grid_area.x;
-    clamped.y -= grid_area.y;
+    {
+        clamped.x -= grid_area.x;
+        clamped.y -= grid_area.y;
 
-    clamped.x = clamped.x / GRID_SIZE * GRID_SIZE;
-    clamped.y = clamped.y / GRID_SIZE * GRID_SIZE;
+        clamped.x = clamped.x / GRID_SIZE * GRID_SIZE;
+        clamped.y = clamped.y / GRID_SIZE * GRID_SIZE;
 
-    // SDL_Point p = rect_clamp_point(grid_area, (SDL_Point) { clamped.x, clamped.y });
-    clamped.x += grid_area.x;
-    clamped.y += grid_area.y;
+        clamped.x += grid_area.x;
+        clamped.y += grid_area.y;
 
-    clamped.w = ((clamped.w + (GRID_SIZE-1)) / GRID_SIZE) * GRID_SIZE;
-    clamped.h = ((clamped.h + (GRID_SIZE-1)) / GRID_SIZE) * GRID_SIZE;
+        clamped.w = ((clamped.w + (GRID_SIZE-1)) / GRID_SIZE) * GRID_SIZE;
+        clamped.h = ((clamped.h + (GRID_SIZE-1)) / GRID_SIZE) * GRID_SIZE;
+    }
 
-    if (clamped.x < grid_area.x) return false;
-    if (clamped.y < grid_area.y) return false;
-    if ((clamped.x + clamped.w) > (grid_area.x + grid_area.w)) return false;
-    if ((clamped.y + clamped.h) > (grid_area.y + grid_area.h)) return false;
+    {
+        if (clamped.x < grid_area.x) return false;
+        if (clamped.y < grid_area.y) return false;
+        if ((clamped.x + clamped.w) > (grid_area.x + grid_area.w)) return false;
+        if ((clamped.y + clamped.h) > (grid_area.y + grid_area.h)) return false;
+    }
+
+    for (gadget_ID child = sell->firstborn_id;
+        child;
+        child = gadget_get(child)->next_sibling_id
+    ) {
+        if (child == gadget_to_clamp)
+            continue;
+
+        /* held gadget can't push you out of your spot */
+        if (child == state.held_gadget)
+            continue;
+
+        if (SDL_HasRectIntersection(&gadget_get(child)->extents, &clamped))
+            return false;
+    }
+
     *to_clamp = clamped;
     return true;
 }
 
-typedef struct {
-    /* TODO: intrusive freelist/active skiplist */
-    uint32_t gen;
-    gadget_Gadget gadget;
-} gadget_Entry;
-
-static struct {
-    gadget_Entry *entries;
-    uint32_t entries_capacity;
-
-    /* don't set held_gadget directly as some gadgets like to see
-     * who used to be held on SDL_EVENT_MOUSE_BUTTON_UP and won't see
-     * that you were the held one if your Event handler runs before theirs.
-     *
-     * instead set held_gadget_next */
-    gadget_ID held_gadget, held_gadget_next;
-} state = {0};
-
 bool gadget_event(SDL_Event *event, SDL_Point canvas_mouse) {
-    state.held_gadget_next = state.held_gadget;
-
     gadget_Do doin = {
         .kind = gadget_DoKind_Event,
         .canvas_mouse = canvas_mouse,
@@ -127,12 +230,12 @@ bool gadget_event(SDL_Event *event, SDL_Point canvas_mouse) {
         }
     }
 
-    state.held_gadget = state.held_gadget_next;
+    gadget_actions_execute();
 
     return capture;
 }
 
-bool gadget_do_offer_draggable_child(gadget_Gadget *gadget, gadget_Do *doin, gadget_ID child_id) {
+static bool gadget_do_offer_draggable_child(gadget_Gadget *gadget, gadget_Do *doin, gadget_ID child_id) {
     bool mouse_up = (doin->kind == gadget_DoKind_Event) &&
                     (doin->body.event.data->type == SDL_EVENT_MOUSE_BUTTON_UP);
 
@@ -152,28 +255,19 @@ bool gadget_do_offer_draggable_child(gadget_Gadget *gadget, gadget_Do *doin, gad
     return false;
 }
 
-bool gadget_do_take_dropped_child(gadget_Gadget *gadget, gadget_Do *doin) {
+static bool gadget_do_take_dropped_child(gadget_Gadget *gadget, gadget_Do *doin) {
     bool mouse_up = (doin->kind == gadget_DoKind_Event) &&
                     (doin->body.event.data->type == SDL_EVENT_MOUSE_BUTTON_UP);
     bool held_hover = state.held_gadget &&
         SDL_HasRectIntersection(&gadget_get(state.held_gadget)->extents, &gadget->extents);
 
-    if (mouse_up && held_hover) {
-        gadget_child_add(gadget->id, state.held_gadget);
-
-        /* we don't want the gadget to double-process the event,
-         * but if it hasn't unheld itself even though the mouse is up,
-         * it needs to process the event, and now that it is owned by
-         * us, it wont get any events at all unless we give them to it. */
-        if (state.held_gadget_next == state.held_gadget) {
-            gadget_do(gadget_get(state.held_gadget), doin);
-        }
-    }
+    if (mouse_up && held_hover)
+        gadget_child_give(gadget->id, state.held_gadget);
 
     return held_hover;
 }
 
-bool gadget_do_take_one_dropped_child(gadget_Gadget *gadget, gadget_Do *doin) {
+static bool gadget_do_take_one_dropped_child(gadget_Gadget *gadget, gadget_Do *doin) {
     /* need to either be childless, or already holding this child */
     if (gadget_childless(gadget->id) || gadget_child_has(gadget->id, state.held_gadget))
         return gadget_do_take_dropped_child(gadget, doin);
@@ -182,8 +276,9 @@ bool gadget_do_take_one_dropped_child(gadget_Gadget *gadget, gadget_Do *doin) {
 
 
 void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
-    bool do_draw  = doin->kind == gadget_DoKind_Draw;
-    bool do_event = doin->kind == gadget_DoKind_Event;
+    bool do_draw    = doin->kind == gadget_DoKind_Draw;
+    bool do_draw_bg = doin->kind == gadget_DoKind_DrawBackground;
+    bool do_event   = doin->kind == gadget_DoKind_Event;
 
     SDL_Point canvas_mouse = doin->canvas_mouse;
 
@@ -202,7 +297,7 @@ void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
 
             SDL_Rect options = rect_cut_bottom(&supply_rect, 30);
 
-            /* child management */
+            /* child management - supply */
             {
                 if (gadget_get(gadget->firstborn_id))
                     gadget_do(gadget_get(gadget->firstborn_id), doin);
@@ -243,7 +338,7 @@ void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
             SDL_Rect title = rect_cut_top(&test_area, 15);
             if (do_draw) draw_text_centered("TEST", title, draw_clr_title, 1);
 
-            /* child management */
+            /* child management - test rig */
             {
                 if (gadget_get(gadget->firstborn_id))
                     gadget_do(gadget_get(gadget->firstborn_id), doin);
@@ -267,7 +362,11 @@ void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
             bool held = state.held_gadget == gadget->id;
             bool hover = state.held_gadget == gadget_ID_NONE && SDL_PointInRect(&canvas_mouse, &area);
 
-            if (do_draw) draw_text_centered("xyz", area, draw_clr_white, 2);
+            if (do_draw) switch (gadget->kind_data.component.kind) {
+                case gadget_ComponentKind_NONE: draw_text_centered("?"  , area, draw_clr_white, 2); break;
+                case gadget_ComponentKind_XYZ : draw_text_centered("xyz", area, draw_clr_white, 2); break;
+                case gadget_ComponentKind_X   : draw_text_centered("x"  , area, draw_clr_white, 2); break;
+            }
 
             if (held || hover) {
                 if (do_draw) {
@@ -282,7 +381,7 @@ void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
                     SDL_Event *event = doin->body.event.data;
                     switch (event->type) {
                         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                            state.held_gadget_next = gadget->id;
+                            gadget_held_set(gadget->id);
                             canvas_mouse_down_pos = canvas_mouse;
                             comp_mouse_down_pos = (SDL_Point) { gadget->extents.x, gadget->extents.y };
                             mouse_down = true;
@@ -297,7 +396,7 @@ void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
                         } break;
 
                         case SDL_EVENT_MOUSE_BUTTON_UP: {
-                            state.held_gadget_next = gadget_ID_NONE;
+                            gadget_held_set(gadget_ID_NONE);
                             mouse_down = false;
                         } break;
                     }
@@ -306,35 +405,67 @@ void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
         } break;
 
         case gadget_Kind_Sell: {
+            uint32_t grid_empty_lite = do_draw_bg ? draw_rgba(0x22, 0x28, 0x22, 0xFF) : 0;
+            uint32_t grid_empty_dark = do_draw_bg ? draw_rgba(0x11, 0x18, 0x11, 0xFF) : 0;
+            uint32_t grid_full_lite  = do_draw_bg ? draw_rgba(0x12, 0x18, 0x12, 0xFF) : 0;
+            uint32_t grid_full_dark  = do_draw_bg ? draw_rgba(0x08, 0x10, 0x08, 0xFF) : 0;
+            uint32_t sell_area_outline = draw_rgba(0xAA, 0xFF, 0xAA, 0xFF);
+            uint32_t sell_item_outline = draw_rgba(0x99, 0xBB, 0x99, 0xFF);
+
             SDL_Rect sell_area = gadget->extents;
-            if (do_draw) draw_rect_outline(sell_area, draw_rgba(0xAA, 0xFF, 0xAA, 0xFF));
+            if (do_draw) draw_rect_outline(sell_area, sell_area_outline);
+
+            if (do_draw_bg) draw_checkerboard(sell_area, 20, grid_empty_lite, grid_empty_dark);
 
             SDL_Rect title = rect_cut_top(&sell_area, 10);
             if (do_draw) draw_text_centered("SELL", title, draw_clr_title, 1);
 
-            /* child management */
+            /* child management - sell */
             {
+
                 for (gadget_ID child = gadget->firstborn_id;
                     child;
                     child = gadget_get(child)->next_sibling_id
                 ) {
+                    SDL_Rect clamped = gadget_get(child)->extents;
+                    bool has_space = gadget_sell_clamp_to_grid(gadget, &clamped, child, sell_area);
+                    // if (gadget_get(child)->kind_data.component.kind == gadget_ComponentKind_XYZ && !has_space) dbg();
+
+                    if (has_space) {
+                        if (do_draw_bg) draw_checkerboard(clamped, 20, grid_full_lite, grid_full_dark);
+                        if (do_draw) draw_rect_outline(clamped, sell_item_outline);
+                    }
                     gadget_do(gadget_get(child), doin);
 
                     if (gadget_do_offer_draggable_child(gadget, doin, child)) {
-                        SDL_Rect clamped = gadget_get(child)->extents;
-                        gadget_clamp_to_grid(&clamped, sell_area);
-
-                        gadget_get(child)->extents = rect_centered_in(clamped, gadget_get(child)->extents);
+                        if (has_space)
+                            gadget_get(child)->extents =
+                                rect_centered_in(clamped, gadget_get(child)->extents);
                     }
                 }
 
                 if (state.held_gadget) {
                     SDL_Rect extents = gadget_get(state.held_gadget)->extents;
-                    if (gadget_clamp_to_grid(&extents, sell_area)) {
+                    if (gadget_sell_clamp_to_grid(gadget, &extents, state.held_gadget, sell_area)) {
                         if (gadget_do_take_dropped_child(gadget, doin) && do_draw)
                             draw_rect_outline(extents, draw_clr_hilite);
                     }
                 }
+
+                /* important to release currently held one
+                 * before updating others, or it will kick them out */
+                if (state.held_gadget && gadget_child_has(gadget->id, state.held_gadget)) {
+                    bool mouse_up = (doin->kind == gadget_DoKind_Event) &&
+                                    (doin->body.event.data->type == SDL_EVENT_MOUSE_BUTTON_UP);
+                    gadget_ID held = state.held_gadget;
+                    SDL_Rect clamped = gadget_get(held)->extents;
+                    bool has_space = gadget_sell_clamp_to_grid(gadget, &clamped, held, sell_area);
+
+                    if (mouse_up && !has_space) {
+                        gadget_child_take(gadget->id, held);
+                    }
+                }
+
             }
 
         } break;
@@ -382,6 +513,7 @@ void gadget_free(gadget_ID id) {
 void gadget_init(void) {
     {
         gadget_ID supply = gadget_alloc((gadget_Gadget) {
+            .debug_str = "supply",
             .extents = { 0, 0, 100, 100 },
             .kind = gadget_Kind_Supply
         });
@@ -389,16 +521,35 @@ void gadget_init(void) {
         gadget_ID component = gadget_alloc((gadget_Gadget) {
             .extents = rect_inflate(draw_text_measure("xyz", 150,  50, 2), 5),
             .kind = gadget_Kind_Component,
+            .kind_data.component.kind = gadget_ComponentKind_XYZ,
+            .debug_str = "supply xyz",
         });
-        gadget_child_add(supply, component);
+        gadget_child_give(supply, component);
     }
 
-    gadget_alloc((gadget_Gadget) { .extents = { 150, 100,  50,  50 }, .kind = gadget_Kind_TestRig   });
-    gadget_alloc((gadget_Gadget) { .extents = { 250,   0, 100, 100 }, .kind = gadget_Kind_Sell      });
+    gadget_alloc((gadget_Gadget) {
+        .extents = { 150, 100,  50,  50 },
+        .kind = gadget_Kind_TestRig,
+        .debug_str = "test rig",
+    });
+    gadget_alloc((gadget_Gadget) {
+        .extents = { 250,   0, 100, 100 },
+        .kind = gadget_Kind_Sell,
+        .debug_str = "sell",
+    });
 
     gadget_alloc((gadget_Gadget) {
         .extents = rect_inflate(draw_text_measure("xyz", 150, 100, 2), 5),
         .kind = gadget_Kind_Component,
+        .kind_data.component.kind = gadget_ComponentKind_XYZ,
+        .debug_str = "floating xyz",
+    });
+
+    gadget_alloc((gadget_Gadget) {
+        .extents = rect_inflate(draw_text_measure("x", 120,  80, 2), 2),
+        .kind = gadget_Kind_Component,
+        .kind_data.component.kind = gadget_ComponentKind_X,
+        .debug_str = "x",
     });
 }
 

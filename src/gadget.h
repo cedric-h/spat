@@ -17,15 +17,30 @@ typedef enum {
     gadget_Kind_Sell,
     /* gadget_Kind_Contract, gadget_Kind_Box, Rent, Debt */
 } gadget_Kind;
+
+typedef enum {
+    gadget_ComponentKind_NONE,
+    gadget_ComponentKind_X,
+    gadget_ComponentKind_XYZ,
+} gadget_ComponentKind;
+
 typedef struct {
     gadget_ID id;
-    gadget_Kind kind;
     SDL_Rect extents;
     gadget_ID daddy_id, firstborn_id, next_sibling_id;
+    char *debug_str;
+
+    gadget_Kind kind;
+    union {
+        struct {
+            gadget_ComponentKind kind;
+        } component;
+    } kind_data;
 } gadget_Gadget;
 
 typedef enum {
     gadget_DoKind_Draw,
+    gadget_DoKind_DrawBackground,
     gadget_DoKind_Event,
     // gadget_Event_Tooltip,
 } gadget_DoKind;

@@ -28,7 +28,8 @@ typedef struct {
 } draw_Surface;
 
 void draw_to(draw_Surface surface, draw_Camera canvas_camera);
-void draw_background(void);
+void draw_grid(int grid_size);
+void draw_checkerboard(SDL_Rect r, int grid_size, uint32_t clr_l, uint32_t clr_r);
 
 void     draw_text(char *str, int x, int y, uint32_t color, int scale);
 SDL_Rect draw_text_measure(char *str, int x, int y, int scale);

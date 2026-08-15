@@ -9,6 +9,7 @@
 #define spat_max(x, y) (((x) > (y)) ? (x) : (y))
 #define spat_clamp(min, max, v) spat_max(min, spat_min(max, v))
 #define countof(arr) (int)( sizeof(arr) / sizeof((arr)[0]) )
+#define log_trace(...) SDL_LogTrace(SDL_LOG_CATEGORY_APPLICATION, __VA_ARGS__)
 
 typedef enum {
     app_Cursor_Default,

@@ -100,21 +100,41 @@ void draw_to(draw_Surface draw_surface, draw_Camera camera) {
     draw.camera = camera;
 }
 
-void draw_background(void) {
+void draw_grid(int grid_size) {
     Uint32 *pixels = (Uint32 *)draw.surface->pixels;
     int pitch = draw.surface->pitch / sizeof(Uint32);
 
     /* draw grid */
     for (int y = 0; y < draw.surface->h; y++) {
         for (int x = 0; x < draw.surface->w; x++) {
-            int cx = SDL_abs(x + draw.camera.x)%100;
-            int cy = SDL_abs(y + draw.camera.y)%100;
+            int cx = SDL_abs(x + draw.camera.x)%grid_size;
+            int cy = SDL_abs(y + draw.camera.y)%grid_size;
             pixels[y * pitch + x] = (cx == 0 || cy == 0)
                 ? SDL_MapSurfaceRGBA(draw.surface, 0x44, 0x44, 0x44, 0xFF)
                 : SDL_MapSurfaceRGBA(draw.surface, 0x22, 0x22, 0x22, 0xFF)
                 ; 
         }
     }
+}
+
+void draw_checkerboard(SDL_Rect rect, int grid_size, uint32_t clr_l, uint32_t clr_r) {
+    rect.x *= draw.camera.scale;
+    rect.y *= draw.camera.scale;
+    rect.w *= draw.camera.scale;
+    rect.h *= draw.camera.scale;
+    rect.x -= draw.camera.x;
+    rect.y -= draw.camera.y;
+
+    Uint32 *pixels = (Uint32 *)draw.surface->pixels;
+    int pitch = draw.surface->pitch / sizeof(Uint32);
+
+    // SDL_FillSurfaceRect(draw.surface, &rect, draw_clr_white);
+    for (int y = spat_max(0, rect.y+1); y < spat_min(draw.surface->h, rect.y + rect.h); y++)
+        for (int x = spat_max(0, rect.x+1); x < spat_min(draw.surface->w, rect.x + rect.w); x++) {
+            int cx = (x - rect.x) / grid_size;
+            int cy = (y - rect.y) / grid_size;
+            pixels[y * pitch + x] = ((cx^cy)%2) ? clr_l : clr_r;
+        }
 }
 
 uint32_t draw_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {

@@ -69,13 +69,16 @@ bool canvas_event(SDL_Event *event) {
 }
 
 void canvas_draw(void) {
-    draw_background();
+    draw_grid(100);
     app.cursor = app_Cursor_Move;
 
-    gadget_Do doin = { .kind = gadget_DoKind_Draw, .canvas_mouse = canvas.mouse };
-    for (gadget_Iter i = {0}; gadget_iter_next(&i);) {
-        gadget_do(i.g, &doin);
-    }
+    gadget_Do doin = { .canvas_mouse = canvas.mouse };
+
+    doin.kind = gadget_DoKind_DrawBackground;
+    for (gadget_Iter i = {0}; gadget_iter_next(&i);) gadget_do(i.g, &doin);
+
+    doin.kind = gadget_DoKind_Draw;
+    for (gadget_Iter i = {0}; gadget_iter_next(&i);) gadget_do(i.g, &doin);
 }
 
 /* disgusting, but used by os_window to not interrupt canvas actions for dragging window */
