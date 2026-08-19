@@ -362,14 +362,58 @@ void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
             SDL_Rect area = gadget->extents;
             bool held = state.held_gadget == gadget->id;
             bool hover = state.held_gadget == gadget_ID_NONE && SDL_PointInRect(&canvas_mouse, &area);
+            bool block_drag_start = false;
 
-            if (do_draw) switch (gadget->kind_data.component.kind) {
-                case gadget_ComponentKind_NONE: draw_text_centered("?"  , area, draw_clr_white, 2); break;
-                case gadget_ComponentKind_XYZ : draw_text_centered("xyz", area, draw_clr_white, 2); break;
-                case gadget_ComponentKind_X   : draw_text_centered("x"  , area, draw_clr_white, 2); break;
+            switch (gadget->kind_data.component.kind) {
+                case gadget_ComponentKind_Aggregate:
+                case gadget_ComponentKind_NONE: {
+                    if (do_draw) draw_text_centered("?"  , area, draw_clr_white, 2);
+                } break;
+
+                case gadget_ComponentKind_Joint: {
+                    // if (do_draw) draw_text_centered("|", area, draw_clr_white, 2);
+
+                    int child_count = 0;
+                    for (gadget_ID child = gadget->firstborn_id;
+                        child;
+                        child = gadget_get(child)->next_sibling_id
+                    )
+                        child_count += 1;
+
+                    SDL_Rect extent = gadget->extents;
+                    SDL_Rect last_rect = {0};
+                    int og_w = extent.w;
+                    for (gadget_ID child = gadget->firstborn_id;
+                        child;
+                        child = gadget_get(child)->next_sibling_id
+                    ) {
+                        SDL_Rect child_extents = rect_cut_left(&extent, og_w / child_count);
+
+                        gadget_get(child)->extents = child_extents;
+                        gadget_do(gadget_get(child), doin);
+
+                        if (last_rect.w) {
+                            SDL_Rect space = rect_union(
+                                rect_cut_right(&last_rect    , 2),
+                                rect_cut_left (&child_extents, 2)
+                            );
+                            if (do_draw) draw_text_centered("|", space, draw_clr_white, 2);
+                            if (SDL_PointInRect(&canvas_mouse, &space)) {
+                                if (do_draw) draw_rect_outline(space, draw_clr_hilite);
+                                block_drag_start = true;
+                            }
+                        }
+                        last_rect = child_extents;
+                    }
+
+                } break;
+
+                case gadget_ComponentKind_X: {
+                    if (do_draw) draw_text_centered("x"  , area, draw_clr_white, 2);
+                } break;
             }
 
-            if (held || hover) {
+            if ((held || hover) && !block_drag_start) {
                 if (do_draw) {
                     app.cursor = held ? app_Cursor_Grabbing : app_Cursor_Grab;
                     draw_rect_outline(area, held ? draw_clr_white : draw_clr_title);
@@ -430,7 +474,6 @@ void gadget_do(gadget_Gadget *gadget, gadget_Do *doin) {
                 ) {
                     SDL_Rect clamped = gadget_get(child)->extents;
                     bool has_space = gadget_sell_clamp_to_grid(gadget, &clamped, child, sell_area);
-                    // if (gadget_get(child)->kind_data.component.kind == gadget_ComponentKind_XYZ && !has_space) dbg();
 
                     if (has_space) {
                         if (do_draw_bg) draw_checkerboard(clamped, 20, grid_full_lite, grid_full_dark);
@@ -519,13 +562,31 @@ void gadget_init(void) {
             .kind = gadget_Kind_Supply
         });
 
-        gadget_ID component = gadget_alloc((gadget_Gadget) {
-            .extents = rect_inflate(draw_text_measure("xyz", 150,  50, 2), 5),
+        gadget_ID joint = gadget_alloc((gadget_Gadget) {
+            .extents = rect_inflate(draw_text_measure("xxx", 150,  50, 2), 5),
             .kind = gadget_Kind_Component,
-            .kind_data.component.kind = gadget_ComponentKind_XYZ,
+            .kind_data.component.kind = gadget_ComponentKind_Joint,
             .debug_str = "supply xyz",
         });
-        gadget_child_give(supply, component);
+        gadget_child_give(supply, joint);
+
+        gadget_ID x0 = gadget_alloc((gadget_Gadget) {
+            .kind = gadget_Kind_Component,
+            .kind_data.component.kind = gadget_ComponentKind_X,
+        });
+        gadget_child_give(joint, x0);
+
+        gadget_ID x1 = gadget_alloc((gadget_Gadget) {
+            .kind = gadget_Kind_Component,
+            .kind_data.component.kind = gadget_ComponentKind_X,
+        });
+        gadget_child_give(joint, x1);
+
+        gadget_ID x2 = gadget_alloc((gadget_Gadget) {
+            .kind = gadget_Kind_Component,
+            .kind_data.component.kind = gadget_ComponentKind_X,
+        });
+        gadget_child_give(joint, x2);
     }
 
     gadget_alloc((gadget_Gadget) {
@@ -537,13 +598,6 @@ void gadget_init(void) {
         .extents = { 250,   0, 100, 100 },
         .kind = gadget_Kind_Sell,
         .debug_str = "sell",
-    });
-
-    gadget_alloc((gadget_Gadget) {
-        .extents = rect_inflate(draw_text_measure("xyz", 150, 100, 2), 5),
-        .kind = gadget_Kind_Component,
-        .kind_data.component.kind = gadget_ComponentKind_XYZ,
-        .debug_str = "floating xyz",
     });
 
     gadget_alloc((gadget_Gadget) {

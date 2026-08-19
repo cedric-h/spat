@@ -30,4 +30,7 @@ SDL_Rect rect_centered_in(SDL_Rect parent, SDL_Rect child);
 /* "clamps" point inside rect */
 SDL_Point rect_clamp_point(SDL_Rect rect, SDL_Point p);
 
+/* combines the rects */
+SDL_Rect rect_union(SDL_Rect l, SDL_Rect r);
+
 #endif

@@ -70,3 +70,9 @@ SDL_Point rect_clamp_point(SDL_Rect r, SDL_Point p) {
         .y = spat_clamp(min_y, max_y, p.y),
     };
 }
+
+SDL_Rect rect_union(SDL_Rect r, SDL_Rect l) {
+    SDL_Rect out = {0};
+    SDL_GetRectUnion(&r, &l, &out);
+    return out;
+}

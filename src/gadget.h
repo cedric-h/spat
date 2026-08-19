@@ -21,7 +21,8 @@ typedef enum {
 typedef enum {
     gadget_ComponentKind_NONE,
     gadget_ComponentKind_X,
-    gadget_ComponentKind_XYZ,
+    gadget_ComponentKind_Joint,
+    gadget_ComponentKind_Aggregate,
 } gadget_ComponentKind;
 
 typedef struct {
