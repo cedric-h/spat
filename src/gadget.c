@@ -137,6 +137,7 @@ static void gadget_actions_execute(void) {
                     }
                     sibling = gadget_get(sibling)->next_sibling_id;
                 }
+                gadget_get(child)->next_sibling_id = gadget_ID_NONE;
             } break;
         }
     }
